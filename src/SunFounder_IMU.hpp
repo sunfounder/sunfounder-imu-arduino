@@ -1,89 +1,51 @@
 #pragma once
 
-#include <Arduino.h>
-#include "sh3001.hpp"
-#include "qmc6310.hpp"
-#include "spl06_001.hpp"
+#include <Wire.h>
 
-// Data structure to hold all IMU data
-struct IMUData {
-    AccelData accel;
-    GyroData gyro;
-    MagData mag;
-    float temperature;
-    float pressure;
-    float altitude;
-    float azimuth;
-};
+#include "barometer.hpp"
+#include "magnetometer.hpp"
+#include "motion_sensor.hpp"
+
+#define Z_PLUS 0
+#define Z_MINUS 1
+#define X_PLUS 2
+#define X_MINUS 3
+#define Y_PLUS 4
+#define Y_MINUS 5
 
 class SunFounder_IMU {
 public:
-    SunFounder_IMU(TwoWire *wire = &Wire);
-    ~SunFounder_IMU();
+  SunFounder_IMU(TwoWire *wire);
 
-    // Initialization methods
-    bool begin();
-    bool init_sh3001();
-    bool init_qmc6310();
-    bool init_spl06_001();
+  MotionSensor *motion_sensor;
+  Magnetometer *magnetometer;
+  Barometer *barometer;
 
-    // Sensor access methods
-    SH3001* get_sh3001();
-    QMC6310* get_qmc6310();
-    SPL06_001* get_spl06_001();
+  bool begin();
 
-    // Data reading methods
-    bool read_all(
-        AccelData &accel,
-        GyroData &gyro,
-        MagData &mag,
-        float &temperature,
-        float &pressure,
-        float &altitude,
-        float &azimuth
-    );
-    
-    bool read(IMUData &data);
+  bool read(bool raw = false);
+  Vector3f get_accel();
+  Vector3f get_gyro();
+  Vector3f get_magnetometer();
+  float get_temperature();
+  float get_azimuth();
+  float get_pressure();
+  float get_altitude();
 
-    bool read_accel(AccelData &accel);
-    bool read_gyro(GyroData &gyro);
-    bool read_mag(MagData &mag);
-    bool read_mag_with_azimuth(MagData &mag, float &azimuth);
-    bool read_pressure(float &pressure);
-    bool read_temperature(float &temperature);
-    bool read_altitude(float &altitude);
-
-    // Calibration methods
-    void calibrate_gyro(uint16_t times = 100);
-    void calibrate_accel_prepare();
-    void calibrate_accel_step();
-    void calibrate_accel_finish();
-    void calibrate_mag_prepare();
-    void calibrate_mag_step();
-    void calibrate_mag_finish(float *offsets = nullptr, float *scales = nullptr);
-    
-    // Unified calibration methods
-    bool calibrate_accel_gyro(uint16_t gyro_times = 100, uint16_t accel_steps = 100);
-    bool calibrate_magnetometer(uint16_t steps = 200);
-    bool calibrate_all(uint16_t gyro_times = 100, uint16_t accel_steps = 100, uint16_t mag_steps = 200);
-
-    // Status methods
-    bool is_accel_gyro_available() const;
-    bool is_magnetometer_available() const;
-    bool is_barometer_available() const;
-    
-    // Chip information methods
-    const char* get_accel_gyro_chip_name() const;
-    const char* get_magnetometer_chip_name() const;
-    const char* get_barometer_chip_name() const;
+  void set_accel_bias(const float bias[3]);
+  void set_accel_scale(const float scale[3]);
+  void set_gyro_bias(const float bias[3]);
+  void set_gyro_scale(const float scale[3]);
+  void set_magnetometer_bias(const float bias[3]);
+  void set_magnetometer_scale(const float scale[3]);
+  void set_barometer_pressure_offset(const float offset);
+  void set_barometer_sealevel_pressure(const float sealevel_pressure);
+  void set_orientation(uint8_t up, uint8_t front);
 
 private:
-    TwoWire *_wire;
-    SH3001 *_sh3001;
-    QMC6310 *_qmc6310;
-    SPL06_001 *_spl06_001;
+  TwoWire *_wire;
 
-    bool _sh3001_available;
-    bool _qmc6310_available;
-    bool _spl06_001_available;
+  MotionSensor *get_motion_sensor(uint8_t *addresses, uint8_t count);
+  Magnetometer *get_magnetometer(uint8_t *addresses, uint8_t count);
+  Barometer *get_barometer(uint8_t *addresses, uint8_t count);
 };

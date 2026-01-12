@@ -1,36 +1,25 @@
 #pragma once
 
 #include <Arduino.h>
-#include <Wire.h>
 
-class I2C {
-private:
-    TwoWire *_wire;
-    uint8_t _address;
-    uint8_t _retry;
+struct Vector3f {
+  float x;
+  float y;
+  float z;
 
-public:
-    I2C(uint8_t address, TwoWire *wire = &Wire, uint8_t retry = 5);
-    ~I2C();
-
-    bool write_byte(uint8_t data);
-    bool write_byte_data(uint8_t reg, uint8_t data);
-    bool write_word_data(uint8_t reg, uint16_t data, bool lsb = false);
-    bool write_i2c_block_data(uint8_t reg, const uint8_t *data, uint8_t length);
-    bool write_i2c_block_data(uint8_t reg, const uint8_t *data, size_t length) {
-        return write_i2c_block_data(reg, data, static_cast<uint8_t>(length));
-    }
-
-    uint8_t read_byte();
-    uint8_t read_byte_data(uint8_t reg);
-    uint16_t read_word_data(uint8_t reg, bool lsb = false);
-    bool read_i2c_block_data(uint8_t reg, uint8_t *data, uint8_t length);
-
-    bool is_ready();
-    static void scan(TwoWire *wire = &Wire);
-    static bool is_device_connected(uint8_t address, TwoWire *wire = &Wire);
+  Vector3f() : x(0), y(0), z(0) {}
+  Vector3f(float x_val, float y_val, float z_val)
+      : x(x_val), y(y_val), z(z_val) {}
 };
+
+#define VECTOR_X_PLUS 0
+#define VECTOR_X_MINUS 1
+#define VECTOR_Y_PLUS 2
+#define VECTOR_Y_MINUS 3
+#define VECTOR_Z_PLUS 4
+#define VECTOR_Z_MINUS 5
 
 // Utility functions
 int32_t twos_complement(uint32_t value, uint8_t bits);
-float mapping(float value, float in_min, float in_max, float out_min, float out_max);
+float mapping(float value, float in_min, float in_max, float out_min,
+              float out_max);

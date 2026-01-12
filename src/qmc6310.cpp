@@ -1,265 +1,236 @@
 #include "qmc6310.hpp"
 #include <Wire.h>
-#include <math.h>
 
-QMC6310::QMC6310(uint8_t address, TwoWire *wire) {
-    _wire = wire;
-    
-    if (address == 0) {
-        _address = find_i2c_address(wire);
-    } else {
-        _address = address;
-    }
-    
-    _i2c = new I2C(_address, _wire);
-    _calibrate_data_temp = nullptr;
-    _calibrate_data_count = 0;
+// I2C addresses
+#define I2C_ADDRESSES [2]{0x1C, 0x3C}
+#define I2C_ADDRESS_COUNT 2
+
+// Register addresses
+#define REG_DATA_X 0x01
+#define REG_DATA_Y 0x03
+#define REG_DATA_Z 0x05
+#define REG_STATUS 0x09
+#define REG_CTL_1 0x0A
+#define REG_CTL_2 0x0B
+#define REG_SIGN 0x29
+
+// Modes
+#define MODE_SUSPEND 0b00
+#define MODE_NORMAL 0b01
+#define MODE_SINGLE 0b10
+#define MODE_CONTINUOUS 0b11
+
+// Output data rates
+#define ODR_10_HZ 0b00
+#define ODR_50_HZ 0b01
+#define ODR_100_HZ 0b10
+#define ODR_200_HZ 0b11
+
+// OSR1 values
+#define OSR1_8 0b00
+#define OSR1_4 0b01
+#define OSR1_2 0b10
+#define OSR1_1 0b11
+
+// OSR2 values
+#define OSR2_1 0b00
+#define OSR2_2 0b01
+#define OSR2_4 0b10
+#define OSR2_8 0b11
+
+// Set/Reset modes
+#define SET_RESET_ON 0b00
+#define SET_ONLY_ON 0b01
+#define SET_RESET_OFF 0b10
+
+// Ranges
+#define RANGE_30_GAUSS 0b00
+#define RANGE_12_GAUSS 0b01
+#define RANGE_8_GAUSS 0b10
+#define RANGE_2_GAUSS 0b11
+
+// Self-test
+#define SELF_TEST_ON 0b1
+#define SELF_TEST_OFF 0b0
+
+// Soft reset
+#define SOFT_RST_ON 0b1
+#define SOFT_RST_OFF 0b0
+
+// Range values in Gauss
+static constexpr float RANGE_GAUSS[] = {
+    30.0f, // RANGE_30_GAUSS
+    12.0f, // RANGE_12_GAUSS
+    8.0f,  // RANGE_8_GAUSS
+    2.0f   // RANGE_2_GAUSS
+};
+
+bool QMC6310::begin() {
+  bool success;
+
+  _i2c->begin();
+
+  success = set_sign(true, true, false);
+  if (!success) {
+    Serial.print("[Error] set_sign failed");
+    return false;
+  }
+
+  success = set_control_register_1(OSR2_8, OSR1_8, ODR_200_HZ, MODE_NORMAL);
+  if (!success) {
+    Serial.print("[Error] set_control_register_1 failed");
+    return false;
+  }
+
+  success = set_control_register_2(SOFT_RST_OFF, SELF_TEST_OFF, RANGE_8_GAUSS,
+                                   SET_RESET_ON);
+  if (!success) {
+    Serial.print("[Error] set_control_register_2 failed");
+    return false;
+  }
 }
 
-QMC6310::~QMC6310() {
-    delete _i2c;
-    
-    if (_calibrate_data_temp != nullptr) {
-        for (size_t i = 0; i < _calibrate_data_count; i++) {
-            delete[] _calibrate_data_temp[i];
-        }
-        delete[] _calibrate_data_temp;
-        _calibrate_data_temp = nullptr;
-        _calibrate_data_count = 0;
-    }
+bool QMC6310::set_control_register_1(uint8_t osr2, uint8_t osr1, uint8_t odr,
+                                     uint8_t mode) {
+  bool success;
+  uint8_t cr1;
+
+  success = _i2c->read_byte_data(REG_CTL_1, &cr1);
+  if (!success) {
+    Serial.print("[Error] ctl1 read failed");
+    return false;
+  }
+  if (mode != 255) {
+    cr1 &= ~(0b11 << 0);       // Clear mode bits
+    cr1 |= (mode & 0b11) << 0; // Set new mode
+  }
+  if (odr != 255) {
+    cr1 &= ~(0b11 << 2);      // Clear ODR bits
+    cr1 |= (odr & 0b11) << 2; // Set new ODR
+  }
+  if (osr1 != 255) {
+    cr1 &= ~(0b11 << 4);       // Clear OSR1 bits
+    cr1 |= (osr1 & 0b11) << 4; // Set new OSR1
+  }
+  if (osr2 != 255) {
+    cr1 &= ~(0b11 << 6);       // Clear OSR2 bits
+    cr1 |= (osr2 & 0b11) << 6; // Set new OSR2
+  }
+  success = _i2c->write_byte_data(REG_CTL_1, cr1);
+  if (!success) {
+    Serial.print("[Error] ctl1 write failed");
+    return false;
+  }
+  return true;
 }
 
-uint8_t QMC6310::find_i2c_address(TwoWire *wire) {
-    for (size_t i = 0; i < I2C_ADDRESS_COUNT; i++) {
-        if (I2C::is_device_connected(I2C_ADDRESSES[i], wire)) {
-            return I2C_ADDRESSES[i];
-        }
-    }
-    return I2C_ADDRESSES[0]; // Default to first address if none found
-}
-
-bool QMC6310::init(
-    uint8_t set_reset_mode,
-    uint8_t mode,
-    uint8_t odr,
-    uint8_t osr1,
-    uint8_t osr2,
-    uint8_t range) {
-    
-    // Set the range
+bool QMC6310::set_control_register_2(uint8_t soft_reset, uint8_t self_test,
+                                     uint8_t range, uint8_t set_reset_mode) {
+  bool success;
+  uint8_t cr2;
+  success = _i2c->read_byte_data(REG_CTL_2, &cr2);
+  if (!success) {
+    Serial.print("[Error] ctl2 read failed");
+    return false;
+  }
+  if (soft_reset != 255) {
+    cr2 &= ~(0b1 << 7);             // Clear soft reset bit
+    cr2 |= (soft_reset & 0b1) << 7; // Set new soft reset
+  }
+  if (self_test != 255) {
+    cr2 &= ~(0b1 << 6);            // Clear self-test bit
+    cr2 |= (self_test & 0b1) << 6; // Set new self-test
+  }
+  if (range != 255) {
     size_t range_index = (range >> 2) & 0x03;
     _range = RANGE_GAUSS[range_index];
-    
-    // Define the sign for X Y and Z axis
-    _i2c->write_byte_data(REG_SIGN, 0x06);
-    
-    // Reset
-    _i2c->write_byte_data(REG_CTL_2, SOFT_RST_ON);
-    delay(10);
-    
-    // Set control register 2
-    _i2c->write_byte_data(REG_CTL_2, set_reset_mode | range);
-    
-    // Set control register 1
-    _i2c->write_byte_data(REG_CTL_1, mode | odr | osr1 | osr2);
-    
-    return true;
+    cr2 &= ~(0b11 << 2);        // Clear range bits
+    cr2 |= (range & 0b11) << 2; // Set new range
+  }
+  if (set_reset_mode != 255) {
+    cr2 &= ~(0b11 << 0);                 // Clear set/reset mode bits
+    cr2 |= (set_reset_mode & 0b11) << 0; // Set new set/reset mode
+  }
+  success = _i2c->write_byte_data(REG_CTL_2, cr2);
+  if (!success) {
+    Serial.print("[Error] ctl2 write failed");
+    return false;
+  }
+  return true;
 }
 
-MagData QMC6310::get_magnetometer_data(bool raw) {
-    MagData data = {0.0f, 0.0f, 0.0f};
-    
-    // Read raw data
-    uint16_t x_raw = _i2c->read_word_data(REG_DATA_X, true); // true for little-endian
-    uint16_t y_raw = _i2c->read_word_data(REG_DATA_Y, true); // true for little-endian
-    uint16_t z_raw = _i2c->read_word_data(REG_DATA_Z, true); // true for little-endian
-    
-    // Convert to signed values
-    int16_t x_signed = twos_complement(x_raw, 16);
-    int16_t y_signed = twos_complement(y_raw, 16);
-    int16_t z_signed = twos_complement(z_raw, 16);
-    
-    // Convert to Gauss
-    float x_gauss = mapping(static_cast<float>(x_signed), -32768.0f, 32767.0f, -_range, _range);
-    float y_gauss = mapping(static_cast<float>(y_signed), -32768.0f, 32767.0f, -_range, _range);
-    float z_gauss = mapping(static_cast<float>(z_signed), -32768.0f, 32767.0f, -_range, _range);
-    
-    if (raw) {
-        data.x = x_gauss;
-        data.y = y_gauss;
-        data.z = z_gauss;
-    } else {
-        // Apply calibration
-        data.x = (x_gauss - _offsets[0]) * _scales[0];
-        data.y = (y_gauss - _offsets[1]) * _scales[1];
-        data.z = (z_gauss - _offsets[2]) * _scales[2];
-    }
-    
-    return data;
+bool QMC6310::set_reset_mode(uint8_t set_reset_mode) {
+  return set_control_register_2(255, 255, 255, set_reset_mode);
+}
+bool QMC6310::set_mode(uint8_t mode) {
+  return set_control_register_1(255, 255, 255, mode);
+}
+bool QMC6310::set_odr(uint8_t odr) {
+  return set_control_register_1(255, 255, odr, 255);
+}
+bool QMC6310::set_osr1(uint8_t osr1) {
+  return set_control_register_1(255, osr1, 255, 255);
+}
+bool QMC6310::set_osr2(uint8_t osr2) {
+  return set_control_register_1(255, 255, osr2, 255);
+}
+bool QMC6310::set_range(uint8_t range) {
+  return set_control_register_2(255, 255, range, 255);
+}
+bool QMC6310::set_sign(bool x, bool y, bool z) {
+  uint8_t sign = 0x00;
+  sign |= (x ? 0b01 : 0b00) << 0;
+  sign |= (y ? 0b01 : 0b00) << 1;
+  sign |= (z ? 0b01 : 0b00) << 2;
+  bool success;
+  success = _i2c->write_byte_data(REG_SIGN, sign);
+  if (!success) {
+    Serial.print("[Error] ");
+    Serial.print(_chip_name);
+    Serial.print(" sign write failed");
+    return false;
+  }
+  return true;
 }
 
-float QMC6310::get_azimuth(const MagData &data, const char *plane) {
-    float azimuth = 0.0f;
-    float x = data.x;
-    float y = data.y;
-    float z = data.z;
-    
-    if (strcmp(plane, "xy") == 0) {
-        azimuth = atan2(x, y) * 180.0f / M_PI;
-        azimuth -= 90.0f;
-    } else if (strcmp(plane, "yz") == 0) {
-        azimuth = atan2(z, y) * 180.0f / M_PI;
-    } else if (strcmp(plane, "xz") == 0) {
-        azimuth = atan2(z, x) * 180.0f / M_PI;
-    }
-    
-    // Ensure azimuth is in [0, 360) range
-    if (azimuth < 0.0f) {
-        azimuth += 360.0f;
-    }
-    
-    return azimuth;
+bool QMC6310::reset() {
+  bool success;
+  success = _i2c->write_byte_data(REG_CTL_2, SOFT_RST_ON);
+  if (!success) {
+    Serial.print("[Error] ");
+    Serial.print(_chip_name);
+    Serial.print(" soft reset write failed");
+    return false;
+  }
+  delay(10);
+  return success;
 }
 
-void QMC6310::read(MagData &mag_data, float &azimuth) {
-    mag_data = get_magnetometer_data();
-    azimuth = get_azimuth(mag_data);
-}
+bool QMC6310::_read() {
+  uint8_t data[6];
+  int16_t x_raw;
+  int16_t y_raw;
+  int16_t z_raw;
 
-void QMC6310::set_calibration(float x_offset, float y_offset, float z_offset,
-                             float x_scale, float y_scale, float z_scale) {
-    _offsets[0] = x_offset;
-    _offsets[1] = y_offset;
-    _offsets[2] = z_offset;
-    
-    _scales[0] = x_scale;
-    _scales[1] = y_scale;
-    _scales[2] = z_scale;
-}
+  bool success;
 
-void QMC6310::calibrate_prepare() {
-    // Free any existing calibration data
-    if (_calibrate_data_temp != nullptr) {
-        for (size_t i = 0; i < _calibrate_data_count; i++) {
-            delete[] _calibrate_data_temp[i];
-        }
-        delete[] _calibrate_data_temp;
-        _calibrate_data_temp = nullptr;
-        _calibrate_data_count = 0;
-    }
-    
-    // Allocate initial memory for 100 data points
-    _calibrate_data_temp = new float*[100];
-    for (size_t i = 0; i < 100; i++) {
-        _calibrate_data_temp[i] = new float[3]();
-    }
-    _calibrate_data_count = 0;
-}
+  success = _i2c->read_i2c_block_data(REG_DATA_X, data, 6);
+  if (!success) {
+    return false;
+  }
 
-void QMC6310::calibrate_step() {
-    MagData data = get_magnetometer_data(true);
-    calibrate_step(data);
-}
+  // Read raw data
+  x_raw = ((int16_t)data[1] << 8) | data[0];
+  y_raw = ((int16_t)data[3] << 8) | data[2];
+  z_raw = ((int16_t)data[5] << 8) | data[4];
 
-void QMC6310::calibrate_step(const MagData &data) {
-    // Reallocate memory if needed
-    if (_calibrate_data_count % 100 == 0 && _calibrate_data_count > 0) {
-        size_t new_size = _calibrate_data_count + 100;
-        float **new_data = new float*[new_size];
-        
-        // Copy existing data
-        for (size_t i = 0; i < _calibrate_data_count; i++) {
-            new_data[i] = _calibrate_data_temp[i];
-        }
-        
-        // Allocate new memory
-        for (size_t i = _calibrate_data_count; i < new_size; i++) {
-            new_data[i] = new float[3]();
-        }
-        
-        // Free old memory
-        delete[] _calibrate_data_temp;
-        _calibrate_data_temp = new_data;
-    }
-    
-    // Store data
-    _calibrate_data_temp[_calibrate_data_count][0] = data.x;
-    _calibrate_data_temp[_calibrate_data_count][1] = data.y;
-    _calibrate_data_temp[_calibrate_data_count][2] = data.z;
-    _calibrate_data_count++;
-}
+  // Convert to Gauss
+  _data.x =
+      mapping(static_cast<float>(x_raw), -32768.0f, 32767.0f, -_range, _range);
+  _data.y =
+      mapping(static_cast<float>(y_raw), -32768.0f, 32767.0f, -_range, _range);
+  _data.z =
+      mapping(static_cast<float>(z_raw), -32768.0f, 32767.0f, -_range, _range);
 
-void QMC6310::calibrate_finish(float *offsets, float *scales) {
-    if (_calibrate_data_count == 0 || _calibrate_data_temp == nullptr) {
-        return;
-    }
-    
-    // Calculate min and max values
-    float x_min = _calibrate_data_temp[0][0];
-    float x_max = _calibrate_data_temp[0][0];
-    float y_min = _calibrate_data_temp[0][1];
-    float y_max = _calibrate_data_temp[0][1];
-    float z_min = _calibrate_data_temp[0][2];
-    float z_max = _calibrate_data_temp[0][2];
-    
-    for (size_t i = 1; i < _calibrate_data_count; i++) {
-        // X axis
-        if (_calibrate_data_temp[i][0] < x_min) x_min = _calibrate_data_temp[i][0];
-        if (_calibrate_data_temp[i][0] > x_max) x_max = _calibrate_data_temp[i][0];
-        
-        // Y axis
-        if (_calibrate_data_temp[i][1] < y_min) y_min = _calibrate_data_temp[i][1];
-        if (_calibrate_data_temp[i][1] > y_max) y_max = _calibrate_data_temp[i][1];
-        
-        // Z axis
-        if (_calibrate_data_temp[i][2] < z_min) z_min = _calibrate_data_temp[i][2];
-        if (_calibrate_data_temp[i][2] > z_max) z_max = _calibrate_data_temp[i][2];
-    }
-    
-    // Calculate offsets and scales
-    float calculated_offsets[3] = {
-        (x_min + x_max) / 2.0f,
-        (y_min + y_max) / 2.0f,
-        (z_min + z_max) / 2.0f
-    };
-    
-    float calculated_scales[3] = {
-        (x_max - x_min) / 2.0f,
-        (y_max - y_min) / 2.0f,
-        (z_max - z_min) / 2.0f
-    };
-    
-    // Calculate average scale
-    float avg_scale = (calculated_scales[0] + calculated_scales[1] + calculated_scales[2]) / 3.0f;
-    
-    // Normalize scales
-    calculated_scales[0] = avg_scale / calculated_scales[0];
-    calculated_scales[1] = avg_scale / calculated_scales[1];
-    calculated_scales[2] = avg_scale / calculated_scales[2];
-    
-    // Update internal offsets and scales
-    _offsets[0] = calculated_offsets[0];
-    _offsets[1] = calculated_offsets[1];
-    _offsets[2] = calculated_offsets[2];
-    
-    _scales[0] = calculated_scales[0];
-    _scales[1] = calculated_scales[1];
-    _scales[2] = calculated_scales[2];
-    
-    // Copy to output parameters if provided
-    if (offsets != nullptr) {
-        offsets[0] = _offsets[0];
-        offsets[1] = _offsets[1];
-        offsets[2] = _offsets[2];
-    }
-    
-    if (scales != nullptr) {
-        scales[0] = _scales[0];
-        scales[1] = _scales[1];
-        scales[2] = _scales[2];
-    }
-}
-
-uint8_t QMC6310::get_address() const {
-    return _address;
+  return true;
 }
