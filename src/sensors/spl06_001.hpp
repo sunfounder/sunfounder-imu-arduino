@@ -4,22 +4,11 @@
 
 class SPL06_001 : public Barometer {
 public:
-  SPL06_001(TwoWire *wire, uint8_t address) : Barometer(wire, address) {}
+  SPL06_001(TwoWire *wire, uint8_t address) : Barometer(wire, address) {
+    _chip_name = "SPL06-001";
+  }
 
   bool begin() override;
-
-  bool set_pressure_configuration(uint8_t measure_rate = 255,
-                                  uint8_t precision = 255);
-  bool set_temperature_configuration(uint8_t external = 255,
-                                     uint8_t measure_rate = 255,
-                                     uint8_t precision = 255);
-  bool set_mode(uint8_t mode) override;
-
-  bool set_temperature_external(bool enable);
-  bool set_pressure_rate(uint8_t rate) override;
-  bool set_pressure_precision(uint8_t precision) override;
-  bool set_temperature_rate(uint8_t rate) override;
-  bool set_temperature_precision(uint8_t precision) override;
 
   bool reset() override;
 
@@ -46,9 +35,20 @@ private:
   bool _read_calibration_coefficients();
   bool _read_id();
 
+  bool set_pressure_configuration(uint8_t measure_rate = 255,
+                                  uint8_t precision = 255);
+  bool set_temperature_configuration(uint8_t external = 255,
+                                     uint8_t measure_rate = 255,
+                                     uint8_t precision = 255);
+  bool set_mode(uint8_t mode);
+
+  bool set_temperature_external(bool enable);
+  bool set_pressure_rate(uint8_t rate);
+  bool set_pressure_precision(uint8_t precision);
+  bool set_temperature_rate(uint8_t rate);
+  bool set_temperature_precision(uint8_t precision);
+
 protected:
-  char _chip_name[10] = "SPL06-001";
-  uint8_t _chip_name_len = sizeof(_chip_name) - 1;
   bool _read_raw_temperature_data_into(int32_t *t_raw);
   bool _read_raw_pressure_data_into(int32_t *p_raw);
 

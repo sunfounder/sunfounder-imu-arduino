@@ -16,14 +16,7 @@ public:
   virtual ~Magnetometer() { delete _i2c; }
 
   virtual bool begin() = 0;
-
-  virtual bool set_sign(bool x, bool y, bool z) = 0;
-  virtual bool set_mode(uint8_t mode) = 0;
-  virtual bool set_odr(uint8_t odr) = 0;
-  virtual bool set_osr1(uint8_t osr1) = 0;
-  virtual bool set_osr2(uint8_t osr2) = 0;
   virtual bool set_range(uint8_t range) = 0;
-  virtual bool set_reset_mode(uint8_t set_reset_mode) = 0;
 
   virtual bool reset() = 0;
 
@@ -129,17 +122,12 @@ public:
   Vector3f get_data() const { return _data; }
   float get_azimuth() const { return _azimuth; }
   uint8_t get_address() const { return _address; }
-  uint8_t get_chip_name(char *chip_name) const {
-    strncpy(chip_name, _chip_name, _chip_name_len);
-    chip_name[_chip_name_len - 1] = '\0';
-    return _chip_name_len;
-  };
+  String get_name() const { return _chip_name; }
 
 protected:
   uint8_t _address;
   I2C *_i2c;
-  char _chip_name[16];
-  uint8_t _chip_name_len;
+  String _chip_name;
 
   float _range;
   Vector3f _data;

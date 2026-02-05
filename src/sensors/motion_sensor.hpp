@@ -18,23 +18,9 @@ public:
 
   virtual bool begin() = 0;
 
-  virtual bool set_accel_low_power(bool enable) = 0;
-  virtual bool set_accel_adc_dither_enable(bool enable) = 0;
-  virtual bool set_accel_filter_enable(bool enable) = 0;
-  virtual bool set_accel_odr(uint8_t odr) = 0;
   virtual bool set_accel_range(uint8_t range) = 0;
-  virtual bool set_accel_low_pass_filter(bool enable, uint8_t filter) = 0;
-
-  virtual bool set_gyro_inactive_detect_enable(bool enable) = 0;
-  virtual bool set_gyro_filter_enable(bool enable) = 0;
-  virtual bool set_gyro_odr(uint8_t odr) = 0;
-  virtual bool set_gyro_low_pass_filter(bool enable, uint8_t filter) = 0;
-  virtual bool set_gyro_x_range(uint8_t range) = 0;
-  virtual bool set_gyro_y_range(uint8_t range) = 0;
-  virtual bool set_gyro_z_range(uint8_t range) = 0;
-
-  virtual bool set_temperature_enable(bool enable) = 0;
-  virtual bool set_temperature_odr(uint8_t odr) = 0;
+  virtual bool set_gyro_range(uint8_t range) = 0;
+  virtual bool reset() = 0;
 
   void set_accel_bias(float x, float y, float z) {
     _accel_bias[0] = x;
@@ -134,19 +120,16 @@ public:
   Vector3f get_gyro_data() const { return _gyro_data; }
   float get_temperature() const { return _temperature; }
   uint8_t get_address() const { return _address; }
-  uint8_t get_chip_name(char *chip_name) const {
-    strncpy(chip_name, _chip_name, _chip_name_len);
-    chip_name[_chip_name_len - 1] = '\0';
-    return _chip_name_len;
-  };
+  String get_name() const { return _chip_name; }
 
 protected:
   uint8_t _address;
   I2C *_i2c;
-  char _chip_name[16];
-  uint8_t _chip_name_len;
+  String _chip_name;
   float _gravity = G;
 
+  float _accel_range;
+  float _gyro_range;
   Vector3f _accel_data;
   Vector3f _gyro_data;
   float _temperature;

@@ -19,11 +19,6 @@ public:
 
   virtual bool begin() = 0;
 
-  virtual bool set_mode(uint8_t mode) = 0;
-  virtual bool set_pressure_rate(uint8_t rate) = 0;
-  virtual bool set_pressure_precision(uint8_t precision) = 0;
-  virtual bool set_temperature_rate(uint8_t rate) = 0;
-  virtual bool set_temperature_precision(uint8_t precision) = 0;
   virtual bool reset() = 0;
 
   bool read_temperature() { return _read_temperature(); };
@@ -60,17 +55,12 @@ public:
   float get_offset() const { return _offset; }
   float get_sealevel_pressure() const { return _sealevel_pressure; }
   uint8_t get_address() const { return _address; };
-  uint8_t get_chip_name(char *chip_name) const {
-    strncpy(chip_name, _chip_name, _chip_name_len);
-    chip_name[_chip_name_len - 1] = '\0';
-    return _chip_name_len;
-  };
+  String get_name() const { return _chip_name; }
 
 protected:
   uint8_t _address;
   I2C *_i2c;
-  char _chip_name[16];
-  uint8_t _chip_name_len;
+  String _chip_name;
 
   float _offset = 0.0f;
   float _sealevel_pressure = P0;

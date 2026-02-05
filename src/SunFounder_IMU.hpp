@@ -2,9 +2,9 @@
 
 #include <Wire.h>
 
-#include "barometer.hpp"
-#include "magnetometer.hpp"
-#include "motion_sensor.hpp"
+#include "sensors/barometer.hpp"
+#include "sensors/magnetometer.hpp"
+#include "sensors/motion_sensor.hpp"
 
 #define Z_PLUS 0
 #define Z_MINUS 1
@@ -22,6 +22,7 @@ public:
   Barometer *barometer;
 
   bool begin();
+  uint8_t scan();
 
   bool read(bool raw = false);
   Vector3f get_accel();
@@ -42,8 +43,18 @@ public:
   void set_barometer_sealevel_pressure(const float sealevel_pressure);
   void set_orientation(uint8_t up, uint8_t front);
 
+  bool is_motion_sensor_found() { return _is_motion_sensor_found; }
+  bool is_magnetometer_found() { return _is_magnetometer_found; }
+  bool is_barometer_found() { return _is_barometer_found; }
+  String get_motion_sensor_name() { return motion_sensor->get_name(); }
+  String get_magnetometer_name() { return magnetometer->get_name(); }
+  String get_barometer_name() { return barometer->get_name(); }
+
 private:
   TwoWire *_wire;
+  bool _is_motion_sensor_found = false;
+  bool _is_magnetometer_found = false;
+  bool _is_barometer_found = false;
 
   MotionSensor *get_motion_sensor(uint8_t *addresses, uint8_t count);
   Magnetometer *get_magnetometer(uint8_t *addresses, uint8_t count);

@@ -84,7 +84,7 @@
 #define CHIP_ID 0x61
 
 // Accelerometer range mapping
-const float ACC_RANGE_MAP[] = {
+const float ACCEL_RANGE_MAP[] = {
     0,     // Reserved (0b000)
     0,     // Reserved (0b001)
     16.0f, // ACC_RANGE_16G (0b010)
@@ -246,6 +246,8 @@ bool SH3001::begin() {
   return true;
 }
 
+bool SH3001::reset() {}
+
 bool SH3001::set_accel_low_power(bool enable) {
   bool success;
   uint8_t conf0;
@@ -314,7 +316,7 @@ bool SH3001::set_accel_range(uint8_t range) {
   }
   conf2 &= 0xF8; // Clear range bits
   conf2 |= (range & 0x07);
-  _accel_range = ACC_RANGE_MAP[range];
+  _accel_range = ACCEL_RANGE_MAP[range];
   success = _i2c->write_byte_data(REG_ACC_CONF2, conf2);
   if (!success) {
     Serial.print("[Error] ");
@@ -415,7 +417,6 @@ bool SH3001::set_gyro_x_range(uint8_t range) {
   }
   conf3 &= 0xF8; // Clear range bits
   conf3 |= (range & 0x07);
-  _gyro_range[0] = GYRO_RANGE_MAP[range];
   success = _i2c->write_byte_data(REG_GYRO_CONF3, conf3);
   if (!success) {
     Serial.print("[Error] ");
@@ -437,7 +438,6 @@ bool SH3001::set_gyro_y_range(uint8_t range) {
   }
   conf4 &= 0xF8; // Clear range bits
   conf4 |= (range & 0x07);
-  _gyro_range[1] = GYRO_RANGE_MAP[range];
   success = _i2c->write_byte_data(REG_GYRO_CONF4, conf4);
   if (!success) {
     Serial.print("[Error] ");
@@ -459,7 +459,6 @@ bool SH3001::set_gyro_z_range(uint8_t range) {
   }
   conf5 &= 0xF8; // Clear range bits
   conf5 |= (range & 0x07);
-  _gyro_range[2] = GYRO_RANGE_MAP[range];
   success = _i2c->write_byte_data(REG_GYRO_CONF5, conf5);
   if (!success) {
     Serial.print("[Error] ");
@@ -469,6 +468,14 @@ bool SH3001::set_gyro_z_range(uint8_t range) {
   }
   return true;
 }
+bool SH3001::set_gyro_range(uint8_t range) {
+  _gyro_range = GYRO_RANGE_MAP[range];
+  set_gyro_x_range(range);
+  set_gyro_y_range(range);
+  set_gyro_z_range(range);
+  return true;
+}
+
 bool SH3001::set_temperature_enable(bool enable) {
   bool success;
   uint8_t conf0;
@@ -555,11 +562,11 @@ bool SH3001::_read_gyro() {
 
   // Convert to dps first
   float x_dps = mapping(static_cast<float>(x_raw), -32768.0f, 32767.0f,
-                        -_gyro_range[0], _gyro_range[0]);
+                        -_gyro_range, _gyro_range);
   float y_dps = mapping(static_cast<float>(y_raw), -32768.0f, 32767.0f,
-                        -_gyro_range[1], _gyro_range[1]);
+                        -_gyro_range, _gyro_range);
   float z_dps = mapping(static_cast<float>(z_raw), -32768.0f, 32767.0f,
-                        -_gyro_range[2], _gyro_range[2]);
+                        -_gyro_range, _gyro_range);
 
   _gyro_data.x = static_cast<float>(x_dps);
   _gyro_data.y = static_cast<float>(y_dps);
@@ -601,11 +608,11 @@ bool SH3001::_read_all() {
 
   // Convert to dps
   float gx_dps = mapping(static_cast<float>(gx_raw), -32768.0f, 32767.0f,
-                         -_gyro_range[0], _gyro_range[0]);
+                         -_gyro_range, _gyro_range);
   float gy_dps = mapping(static_cast<float>(gy_raw), -32768.0f, 32767.0f,
-                         -_gyro_range[1], _gyro_range[1]);
+                         -_gyro_range, _gyro_range);
   float gz_dps = mapping(static_cast<float>(gz_raw), -32768.0f, 32767.0f,
-                         -_gyro_range[2], _gyro_range[2]);
+                         -_gyro_range, _gyro_range);
 
   // Set gyroscope data
   _gyro_data.x = gx_dps;
@@ -613,7 +620,7 @@ bool SH3001::_read_all() {
   _gyro_data.z = gz_dps;
 
   // Read temperature data (big-endian format)
-  uint16_t temp_raw = (all_data[12] << 8) | all_data[13];
+  uint16_t temp_raw = (all_data[13] << 8) | all_data[12];
   temp_raw = temp_raw & 0x0FFF; // 12-bit value
   _temperature = (temp_raw - _room_temp) / 16.0f + 25.0f;
 

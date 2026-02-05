@@ -1,25 +1,23 @@
 #include "SunFounder_IMU.hpp"
 
-#include "qmc6310.hpp"
-#include "sh3001.hpp"
-#include "spl06_001.hpp"
+#include "sensors/qmi8658b.hpp"
+#include "sensors/sh3001.hpp"
+
+#include "sensors/qmc6309.hpp"
+#include "sensors/qmc6310.hpp"
+
+#include "sensors/spl06_001.hpp"
 
 SunFounder_IMU::SunFounder_IMU(TwoWire *wire) : _wire(wire) {}
 
 bool SunFounder_IMU::begin() {
-  uint8_t addresses[128];
-  uint8_t address;
-  uint8_t count;
+  _wire->begin();
+
+  uint8_t addresses[20];
+  uint8_t count = I2C::scan(_wire, addresses);
+
   bool success = true;
 
-  _wire->begin();
-  for (uint8_t i = 0; i < 5; i++) {
-    count = I2C::scan(_wire, addresses);
-    if (count != 0) {
-      break;
-    }
-    delay(1000);
-  }
   motion_sensor = get_motion_sensor(addresses, count);
   if (motion_sensor == nullptr) {
     Serial.println("[Warning] No motion sensor found");
@@ -28,6 +26,9 @@ bool SunFounder_IMU::begin() {
     if (!success) {
       Serial.println("[Warning] Failed to begin motion sensor");
       motion_sensor = nullptr;
+      _is_motion_sensor_found = false;
+    } else {
+      _is_motion_sensor_found = true;
     }
   }
 
@@ -39,6 +40,9 @@ bool SunFounder_IMU::begin() {
     if (!success) {
       Serial.println("[Warning] Failed to begin magnetometer");
       magnetometer = nullptr;
+      _is_magnetometer_found = false;
+    } else {
+      _is_magnetometer_found = true;
     }
   }
 
@@ -50,6 +54,9 @@ bool SunFounder_IMU::begin() {
     if (!success) {
       Serial.println("[Warning] Failed to begin barometer");
       barometer = nullptr;
+      _is_barometer_found = false;
+    } else {
+      _is_barometer_found = true;
     }
   }
 }
@@ -59,6 +66,8 @@ MotionSensor *SunFounder_IMU::get_motion_sensor(uint8_t *addresses,
   for (uint8_t i = 0; i < count; i++) {
     if (addresses[i] == 0x36 || addresses[i] == 0x37) {
       return new SH3001(_wire, addresses[i]);
+    } else if (addresses[i] == 0x6B || addresses[i] == 0x6A) {
+      return new QMI8658B(_wire, addresses[i]);
     }
   }
   return nullptr;
@@ -67,8 +76,10 @@ MotionSensor *SunFounder_IMU::get_motion_sensor(uint8_t *addresses,
 Magnetometer *SunFounder_IMU::get_magnetometer(uint8_t *addresses,
                                                uint8_t count) {
   for (uint8_t i = 0; i < count; i++) {
-    if (addresses[i] == 0x1C) {
+    if (addresses[i] == 0x1C || addresses[i] == 0x3C) {
       return new QMC6310(_wire, addresses[i]);
+    } else if (addresses[i] == 0x7C || addresses[i] == 0x0C) {
+      return new QMC6309(_wire, addresses[i]);
     }
   }
   return nullptr;
