@@ -46,9 +46,21 @@ public:
   bool is_motion_sensor_found() { return _is_motion_sensor_found; }
   bool is_magnetometer_found() { return _is_magnetometer_found; }
   bool is_barometer_found() { return _is_barometer_found; }
-  String get_motion_sensor_name() { return motion_sensor->get_name(); }
-  String get_magnetometer_name() { return magnetometer->get_name(); }
-  String get_barometer_name() { return barometer->get_name(); }
+  String get_motion_sensor_name() {
+    if (motion_sensor == nullptr)
+      return "Not Connected";
+    return motion_sensor->get_name();
+  }
+  String get_magnetometer_name() {
+    if (magnetometer == nullptr)
+      return "Not Connected";
+    return magnetometer->get_name();
+  }
+  String get_barometer_name() {
+    if (barometer == nullptr)
+      return "Not Connected";
+    return barometer->get_name();
+  }
 
 private:
   TwoWire *_wire;

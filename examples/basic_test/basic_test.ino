@@ -3,13 +3,22 @@
 
 #include "Wire.h"
 
-SunFounder_IMU imu(&Wire1);
+// For Arduino UNO R4, use Wire1 as I2C bus
+// #define Wire Wire1
+// For ESP32, you may need to set the I2C pins
+#define SDA 43
+#define SCL 44
+
+SunFounder_IMU imu(&Wire);
 
 void setup() {
   Serial.begin(115200);
   while (!Serial) {
     delay(100);
   }
+  // For ESP32, you may need to set the I2C pins
+  Wire.begin(SDA, SCL);
+  // Wire.begin();
   imu.begin();
   imu.set_accel_bias(ACCEL_BIAS);
   imu.set_accel_scale(ACCEL_SCALE);
@@ -26,40 +35,46 @@ void setup() {
 
 void loop() {
   imu.read();
-  Vector3f accel = imu.get_accel();
-  Vector3f gyro = imu.get_gyro();
-  Vector3f magnetometer = imu.get_magnetometer();
-  float temperature = imu.get_temperature();
-  float azimuth = imu.get_azimuth();
-  float pressure = imu.get_pressure();
-  float altitude = imu.get_altitude();
+  if (imu.is_motion_sensor_found()) {
+    Vector3f accel = imu.get_accel();
+    Vector3f gyro = imu.get_gyro();
 
-  Serial.print("Accel: ");
-  Serial.print(accel.x);
-  Serial.print(", ");
-  Serial.print(accel.y);
-  Serial.print(", ");
-  Serial.println(accel.z);
-  Serial.print("Gyro: ");
-  Serial.print(gyro.x);
-  Serial.print(", ");
-  Serial.print(gyro.y);
-  Serial.print(", ");
-  Serial.println(gyro.z);
-  Serial.print("Magnetometer: ");
-  Serial.print(magnetometer.x);
-  Serial.print(", ");
-  Serial.print(magnetometer.y);
-  Serial.print(", ");
-  Serial.println(magnetometer.z);
-  Serial.print("Azimuth: ");
-  Serial.println(azimuth);
-  Serial.print("Temperature: ");
-  Serial.println(temperature);
-  Serial.print("Pressure: ");
-  Serial.println(pressure);
-  Serial.print("Altitude: ");
-  Serial.println(altitude);
+    Serial.print("Accel: ");
+    Serial.print(accel.x);
+    Serial.print(", ");
+    Serial.print(accel.y);
+    Serial.print(", ");
+    Serial.println(accel.z);
+    Serial.print("Gyro: ");
+    Serial.print(gyro.x);
+    Serial.print(", ");
+    Serial.print(gyro.y);
+    Serial.print(", ");
+    Serial.println(gyro.z);
+  }
+  if (imu.is_magnetometer_found()) {
+    Vector3f magnetometer = imu.get_magnetometer();
+    float azimuth = imu.get_azimuth();
+    Serial.print("Magnetometer: ");
+    Serial.print(magnetometer.x);
+    Serial.print(", ");
+    Serial.print(magnetometer.y);
+    Serial.print(", ");
+    Serial.println(magnetometer.z);
+    Serial.print("Azimuth: ");
+    Serial.println(azimuth);
+  }
+  if (imu.is_barometer_found()) {
+    float temperature = imu.get_temperature();
+    float pressure = imu.get_pressure();
+    float altitude = imu.get_altitude();
 
+    Serial.print("Temperature: ");
+    Serial.println(temperature);
+    Serial.print("Pressure: ");
+    Serial.println(pressure);
+    Serial.print("Altitude: ");
+    Serial.println(altitude);
+  }
   delay(1000);
 }

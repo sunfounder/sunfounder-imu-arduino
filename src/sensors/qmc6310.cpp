@@ -88,6 +88,7 @@ bool QMC6310::begin() {
     Serial.print("[Error] set_control_register_2 failed");
     return false;
   }
+  return true;
 }
 
 bool QMC6310::set_control_register_1(uint8_t osr2, uint8_t osr1, uint8_t odr,

@@ -1,7 +1,13 @@
 #include "SunFounder_IMU.hpp"
 #include "Wire.h"
 
-SunFounder_IMU imu(&Wire1);
+// For Arduino UNO R4, use Wire1 as I2C bus
+#define Wire Wire1
+// For ESP32, you may need to set the I2C pins
+#define SDA 43
+#define SCL 44
+
+SunFounder_IMU imu(&Wire);
 
 const char *FACES[] = {"Z face up",   "Z face down", "X face up",
                        "X face down", "Y face up",   "Y face down"};
@@ -80,6 +86,9 @@ void setup() {
   while (!Serial) {
     delay(100);
   }
+  // For ESP32, you may need to set the I2C pins
+  Wire.begin(SDA, SCL);
+  // Wire.begin();
   imu.begin();
   Serial.println("IMU initialized successfully.");
   Serial.println("Starting calibration process...");

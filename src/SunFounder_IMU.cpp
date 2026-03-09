@@ -11,7 +11,6 @@
 SunFounder_IMU::SunFounder_IMU(TwoWire *wire) : _wire(wire) {}
 
 bool SunFounder_IMU::begin() {
-  _wire->begin();
 
   uint8_t addresses[20];
   uint8_t count = I2C::scan(_wire, addresses);
@@ -59,6 +58,8 @@ bool SunFounder_IMU::begin() {
       _is_barometer_found = true;
     }
   }
+
+  return success;
 }
 
 MotionSensor *SunFounder_IMU::get_motion_sensor(uint8_t *addresses,
