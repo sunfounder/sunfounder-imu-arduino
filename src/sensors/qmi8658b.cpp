@@ -304,7 +304,9 @@ bool QMI8658B::set_mode(uint8_t mode) {
     Serial.println(" unknown mode");
     return false;
   }
+  return false;
 }
+
 bool QMI8658B::reset() {
   bool success;
   success = _i2c->write_byte_data(REG_RESET, SOFTWARE_RESET);
@@ -517,6 +519,7 @@ bool QMI8658B::set_ctrl7(uint8_t sync_sample, uint8_t drdy_dis,
     Serial.print(" ctrl7 write failed");
     return false;
   }
+  return true;
 }
 
 bool QMI8658B::set_ctrl8(uint8_t ctrl9_handshake_type, uint8_t activity_int_sel,
@@ -562,6 +565,7 @@ bool QMI8658B::set_ctrl8(uint8_t ctrl9_handshake_type, uint8_t activity_int_sel,
     Serial.print(" ctrl8 write failed");
     return false;
   }
+  return true;
 }
 
 bool QMI8658B::set_accel_range(uint8_t range) {

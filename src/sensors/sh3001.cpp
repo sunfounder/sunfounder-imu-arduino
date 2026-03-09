@@ -246,7 +246,7 @@ bool SH3001::begin() {
   return true;
 }
 
-bool SH3001::reset() {}
+bool SH3001::reset() { return true; }
 
 bool SH3001::set_accel_low_power(bool enable) {
   bool success;

@@ -266,6 +266,7 @@ bool SPL06_001::_read_calibration_coefficients() {
 
   uint32_t c30_val = ((uint32_t)data[16] << 8) | data[17];
   _calib_coeffs.c30 = static_cast<int16_t>(twos_complement(c30_val, 16));
+  return true;
 }
 
 bool SPL06_001::_read_raw_temperature_data_into(int32_t *temperature) {
