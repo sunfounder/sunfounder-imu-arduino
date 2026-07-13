@@ -3,11 +3,11 @@
 
 #include "Wire.h"
 
-// For Arduino UNO R4, use Wire1 as I2C bus
-// #define Wire Wire1
+// For Arduino UNO R4 or UNO Q, use Wire1 as I2C bus
+#define Wire Wire1
 // For ESP32, you may need to set the I2C pins
-#define SDA 43
-#define SCL 44
+// #define SDA 43
+// #define SCL 44
 
 SunFounder_IMU imu(&Wire);
 
@@ -17,8 +17,9 @@ void setup() {
     delay(100);
   }
   // For ESP32, you may need to set the I2C pins
-  Wire.begin(SDA, SCL);
-  // Wire.begin();
+  // Wire.begin(SDA, SCL);
+  // For Arduino UNO Q, you need to use the default Wire1 pins
+  Wire.begin();
   imu.begin();
   imu.set_accel_bias(ACCEL_BIAS);
   imu.set_accel_scale(ACCEL_SCALE);
